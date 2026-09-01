@@ -286,9 +286,15 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
       return;
     }
     final state = await CarWindowService.getWindowState();
-    if (fullScreenState.value &&
+    final useImmersiveMode = fullScreenState.value &&
         state.supported &&
-        state.isHostFullScreen) {
+        state.isHostFullScreen;
+    CarWindowService.recordEvent(
+      'playerFullscreen=${fullScreenState.value}, '
+      'systemUi=${useImmersiveMode ? 'immersiveSticky' : 'edgeToEdge'}',
+      state,
+    );
+    if (useImmersiveMode) {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
       await SystemChrome.setEnabledSystemUIMode(

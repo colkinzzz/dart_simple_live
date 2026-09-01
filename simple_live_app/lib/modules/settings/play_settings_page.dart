@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simple_live_app/app/app_style.dart';
 import 'package:simple_live_app/app/controller/app_settings_controller.dart';
+import 'package:simple_live_app/modules/settings/car_diagnostics_page.dart';
 import 'package:simple_live_app/widgets/settings/settings_card.dart';
 import 'package:simple_live_app/widgets/settings/settings_menu.dart';
 import 'package:simple_live_app/widgets/settings/settings_number.dart';
 import 'package:simple_live_app/widgets/settings/settings_switch.dart';
-import 'package:simple_live_app/services/car_window_service.dart';
 
 class PlaySettingsPage extends GetView<AppSettingsController> {
   const PlaySettingsPage({Key? key}) : super(key: key);
@@ -156,37 +156,17 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
                         unit: "dp",
                         onChanged: controller.setCarBottomSafePadding,
                       ),
-                      AppStyle.divider,
-                      ListTile(
-                        minTileHeight: 56,
-                        title: const Text("检测当前窗口"),
-                        subtitle: const Text("查看分屏、窗口尺寸和系统安全区"),
-                        trailing: const Icon(Icons.monitor_outlined),
-                        onTap: () async {
-                          final state =
-                              await CarWindowService.getWindowState();
-                          if (!context.mounted) return;
-                          showDialog<void>(
-                            context: context,
-                            builder: (dialogContext) => AlertDialog(
-                              title: const Text("车机窗口状态"),
-                              content: SelectableText(
-                                state.supported
-                                    ? state.diagnosticText
-                                    : "无法读取窗口状态，请重新启动应用后再试。",
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(dialogContext).pop(),
-                                  child: const Text("确定"),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
                     ],
+                    AppStyle.divider,
+                    ListTile(
+                      minTileHeight: 64,
+                      title: const Text("设备与窗口诊断"),
+                      subtitle: const Text("采集手机/车机显示、窗口、系统栏和适配信息"),
+                      trailing: const Icon(Icons.monitor_heart_outlined),
+                      onTap: () => Get.to<void>(
+                        () => const CarDiagnosticsPage(),
+                      ),
+                    ),
                   ],
                 ),
               ),
