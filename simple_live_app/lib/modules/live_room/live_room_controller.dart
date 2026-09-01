@@ -82,7 +82,6 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
   var countdown = 60.obs;
 
   Timer? autoExitTimer;
-  Timer? _carWindowMetricsTimer;
 
   /// 设置的自动关闭时间（分钟）
   var autoExitMinutes = 60.obs;
@@ -1018,28 +1017,7 @@ ${error?.stackTrace}''');
     if (state == AppLifecycleState.resumed) {
       Log.d("返回前台");
       isBackground = false;
-      if (Platform.isAndroid &&
-          AppSettingsController.instance.carMode.value) {
-        syncCarSystemUi();
-      }
     }
-  }
-
-  @override
-  void didChangeMetrics() {
-    super.didChangeMetrics();
-    if (!Platform.isAndroid ||
-        !AppSettingsController.instance.carMode.value) {
-      return;
-    }
-
-    // OEM split-screen transitions can emit several intermediate sizes. Wait
-    // for the final bounds before deciding whether system bars may be hidden.
-    _carWindowMetricsTimer?.cancel();
-    _carWindowMetricsTimer = Timer(
-      const Duration(milliseconds: 350),
-      syncCarSystemUi,
-    );
   }
 
   // 用于启动开播时长计算和更新的函数
@@ -1078,7 +1056,6 @@ ${error?.stackTrace}''');
     WidgetsBinding.instance.removeObserver(this);
     scrollController.removeListener(scrollListener);
     autoExitTimer?.cancel();
-    _carWindowMetricsTimer?.cancel();
 
     liveDanmaku.stop();
     danmakuController = null;
@@ -1086,3 +1063,4 @@ ${error?.stackTrace}''');
     super.onClose();
   }
 }
+

@@ -86,7 +86,7 @@ class AppSettingsController extends GetxController {
     carMode.value = LocalStorageService.instance
         .getValue(LocalStorageService.kCarMode, true);
     carHideSystemBars.value = LocalStorageService.instance
-        .getValue(LocalStorageService.kCarHideSystemBars, true);
+        .getValue(LocalStorageService.kCarHideSystemBars, false);
     carTopSafePadding.value = LocalStorageService.instance
         .getValue(LocalStorageService.kCarTopSafePadding, 0);
     carBottomSafePadding.value = LocalStorageService.instance
@@ -388,7 +388,9 @@ class AppSettingsController extends GetxController {
     LocalStorageService.instance.setValue(LocalStorageService.kCarMode, e);
   }
 
-  var carHideSystemBars = true.obs;
+  // Kept for storage compatibility. System bars are never changed in car mode
+  // because OEM custom split-screen state cannot be detected reliably.
+  var carHideSystemBars = false.obs;
   void setCarHideSystemBars(bool e) {
     carHideSystemBars.value = e;
     LocalStorageService.instance
@@ -568,3 +570,4 @@ class AppSettingsController extends GetxController {
         .setValue(LocalStorageService.kPlayerForceHttps, e);
   }
 }
+

@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:simple_live_app/app/app_style.dart';
 import 'package:simple_live_app/app/controller/app_settings_controller.dart';
@@ -132,28 +131,9 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
                       title: "车机模式",
                       subtitle: "应用内全屏只铺满当前窗口，不强制车机退出分屏",
                       value: controller.carMode.value,
-                      onChanged: (e) async {
-                        controller.setCarMode(e);
-                        if (e) {
-                          await SystemChrome.setEnabledSystemUIMode(
-                            SystemUiMode.manual,
-                            overlays: SystemUiOverlay.values,
-                          );
-                        } else {
-                          await SystemChrome.setEnabledSystemUIMode(
-                            SystemUiMode.edgeToEdge,
-                          );
-                        }
-                      },
+                      onChanged: controller.setCarMode,
                     ),
                     if (controller.carMode.value) ...[
-                      AppStyle.divider,
-                      SettingsSwitch(
-                        title: "双全屏时隐藏系统栏",
-                        subtitle: "仅当检测到车机已是整屏且播放器全屏时尝试隐藏",
-                        value: controller.carHideSystemBars.value,
-                        onChanged: controller.setCarHideSystemBars,
-                      ),
                       AppStyle.divider,
                       SettingsNumber(
                         title: "顶部额外安全区",
@@ -351,3 +331,4 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
     );
   }
 }
+

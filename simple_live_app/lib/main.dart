@@ -48,14 +48,9 @@ void main() async {
   );
   //初始化服务
   await initServices();
-  if (Platform.isAndroid && AppSettingsController.instance.carMode.value) {
-    await SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values,
-    );
-  } else {
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  }
+  // Edge-to-edge lets the app background continue behind the transparent OEM
+  // status bar. Interactive content is still protected by the car SafeArea.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   //设置状态栏为透明
   SystemUiOverlayStyle systemUiOverlayStyle = const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -313,13 +308,17 @@ class MyApp extends StatelessWidget {
               );
 
               if (isCarMode) {
-                appContent = SafeArea(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      top: settings.carTopSafePadding.value.toDouble(),
-                      bottom: settings.carBottomSafePadding.value.toDouble(),
+                appContent = ColoredBox(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        top: settings.carTopSafePadding.value.toDouble(),
+                        bottom:
+                            settings.carBottomSafePadding.value.toDouble(),
+                      ),
+                      child: appContent,
                     ),
-                    child: appContent,
                   ),
                 );
               }
@@ -335,3 +334,4 @@ class MyApp extends StatelessWidget {
     }));
   }
 }
+

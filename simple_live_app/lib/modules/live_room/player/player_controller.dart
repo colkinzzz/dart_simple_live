@@ -19,7 +19,6 @@ import 'package:simple_live_app/app/controller/base_controller.dart';
 import 'package:simple_live_app/app/custom_throttle.dart';
 import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
-import 'package:simple_live_app/services/car_window_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -256,7 +255,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     //pip.dispose();
     if (Platform.isAndroid &&
         AppSettingsController.instance.carMode.value) {
-      await _showCarSystemBars();
+      // The vehicle shell owns system bars and orientation in car mode.
     } else {
       await SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.edgeToEdge,
@@ -281,10 +280,9 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     fullScreenState.value = true;
     if (Platform.isAndroid &&
         AppSettingsController.instance.carMode.value) {
-      // Car fullscreen only fills the Activity's current bounds. Never request
-      // an orientation change here: several OEM launchers promote a split
-      // Activity to the whole display when an app requests landscape/immersive.
-      unawaited(syncCarSystemUi());
+      // Only change the player layout. Even immersive-mode requests can make
+      // some OEM launchers promote a custom 2/3 split window to full display.
+      return;
     } else if (Platform.isAndroid || Platform.isIOS) {
       //全屏
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
@@ -303,7 +301,6 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     if (Platform.isAndroid &&
         AppSettingsController.instance.carMode.value) {
       fullScreenState.value = false;
-      unawaited(_showCarSystemBars());
       return;
     } else if (Platform.isAndroid || Platform.isIOS) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge,
@@ -315,44 +312,6 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     fullScreenState.value = false;
 
     //danmakuController?.clear();
-  }
-
-  /// Synchronize immersive UI with the host window without changing the host
-  /// split/fullscreen state. The OEM bars are only hidden after the launcher
-  /// has already given this Activity the full display and the player itself is
-  /// fullscreen.
-  Future<void> syncCarSystemUi() async {
-    if (!Platform.isAndroid ||
-        !AppSettingsController.instance.carMode.value) {
-      return;
-    }
-
-    final shouldConsiderImmersive = fullScreenState.value &&
-        AppSettingsController.instance.carHideSystemBars.value;
-    if (!shouldConsiderImmersive) {
-      await _showCarSystemBars();
-      return;
-    }
-
-    final windowState = await CarWindowService.getWindowState();
-    if (!fullScreenState.value) {
-      await _showCarSystemBars();
-      return;
-    }
-
-    Log.d('Car window: ${windowState.diagnosticText}');
-    if (windowState.supported && windowState.isHostFullScreen) {
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      await _showCarSystemBars();
-    }
-  }
-
-  Future<void> _showCarSystemBars() async {
-    await SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values,
-    );
   }
 
   Size? _lastWindowSize;
@@ -900,3 +859,4 @@ class PlayerController extends BaseController
     super.onClose();
   }
 }
+
