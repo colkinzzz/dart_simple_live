@@ -19,4 +19,4 @@
 
 车厂可以拒绝应用隐藏状态栏或空调控制条；此时应用会继续保留安全区域，避免控件被系统层覆盖。
 
-车机构建工作流复用仓库发布流程的 `KEYSTORE_BASE64`、`STORE_PASSWORD`、`KEY_PASSWORD` 和 `KEY_ALIAS` Secrets，确保后续车机版可以覆盖升级。
+车机构建工作流会优先使用 `KEYSTORE_BASE64`、`STORE_PASSWORD`、`KEY_PASSWORD` 和 `KEY_ALIAS` Secrets。未配置时仍可使用临时测试签名构建，但不同运行生成的 APK 不能互相覆盖升级。

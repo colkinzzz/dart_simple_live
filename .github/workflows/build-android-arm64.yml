@@ -31,21 +31,40 @@ jobs:
           flutter-version: "3.38.x"
           cache: true
 
-      - name: Download Android keystore
-        id: android_keystore
-        uses: timheuer/base64-to-file@v1.2
-        with:
-          fileName: keystore.jks
-          encodedString: ${{ secrets.KEYSTORE_BASE64 }}
-
       - name: Configure Android signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          cat > simple_live_app/android/key.properties <<EOF
-          storeFile=${{ steps.android_keystore.outputs.filePath }}
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ] && [ -n "$KEY_ALIAS" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > simple_live_app/android/app/upload-keystore.jks
+            cat > simple_live_app/android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
           EOF
+            echo "Using the repository signing key."
+          else
+            keytool -genkeypair -v \
+              -keystore simple_live_app/android/app/upload-keystore.jks \
+              -storepass android \
+              -keypass android \
+              -alias upload \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Simple Live Car,O=Local,C=CN"
+            cat > simple_live_app/android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=android
+          keyPassword=android
+          keyAlias=upload
+          EOF
+            echo "Signing Secrets are not configured; using a temporary test key."
+          fi
 
       - name: Restore packages
         run: |
