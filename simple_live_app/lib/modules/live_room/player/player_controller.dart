@@ -19,6 +19,7 @@ import 'package:simple_live_app/app/controller/base_controller.dart';
 import 'package:simple_live_app/app/custom_throttle.dart';
 import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
+import 'package:simple_live_app/services/car_window_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -255,7 +256,10 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     //pip.dispose();
     if (Platform.isAndroid &&
         AppSettingsController.instance.carMode.value) {
-      // The vehicle shell owns system bars and orientation in car mode.
+      await SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.edgeToEdge,
+        overlays: SystemUiOverlay.values,
+      );
     } else {
       await SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.edgeToEdge,
@@ -276,12 +280,31 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
   }
 
   /// 进入全屏
+  Future<void> syncCarSystemUi() async {
+    if (!Platform.isAndroid ||
+        !AppSettingsController.instance.carMode.value) {
+      return;
+    }
+    final state = await CarWindowService.getWindowState();
+    if (fullScreenState.value &&
+        state.supported &&
+        state.isHostFullScreen) {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      await SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.edgeToEdge,
+        overlays: SystemUiOverlay.values,
+      );
+    }
+  }
+
   void enterFullScreen() {
     fullScreenState.value = true;
     if (Platform.isAndroid &&
         AppSettingsController.instance.carMode.value) {
-      // Only change the player layout. Even immersive-mode requests can make
-      // some OEM launchers promote a custom 2/3 split window to full display.
+      // Hide the OEM bars only when the host already grants the Activity the
+      // physical display width. In the 2/3 pane this remains in-window only.
+      syncCarSystemUi();
       return;
     } else if (Platform.isAndroid || Platform.isIOS) {
       //全屏
@@ -301,6 +324,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     if (Platform.isAndroid &&
         AppSettingsController.instance.carMode.value) {
       fullScreenState.value = false;
+      syncCarSystemUi();
       return;
     } else if (Platform.isAndroid || Platform.isIOS) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge,
@@ -859,4 +883,3 @@ class PlayerController extends BaseController
     super.onClose();
   }
 }
-

@@ -12,6 +12,7 @@ class CarWindowState {
     required this.height,
     required this.maximumWidth,
     required this.maximumHeight,
+    required this.widthRatio,
     required this.insetLeft,
     required this.insetTop,
     required this.insetRight,
@@ -26,6 +27,7 @@ class CarWindowState {
   final double height;
   final double maximumWidth;
   final double maximumHeight;
+  final double widthRatio;
   final double insetLeft;
   final double insetTop;
   final double insetRight;
@@ -40,6 +42,7 @@ class CarWindowState {
         height: 0,
         maximumWidth: 0,
         maximumHeight: 0,
+        widthRatio: 0,
         insetLeft: 0,
         insetTop: 0,
         insetRight: 0,
@@ -59,6 +62,7 @@ class CarWindowState {
       height: number('height'),
       maximumWidth: number('maximumWidth'),
       maximumHeight: number('maximumHeight'),
+      widthRatio: number('widthRatio'),
       insetLeft: number('insetLeft'),
       insetTop: number('insetTop'),
       insetRight: number('insetRight'),
@@ -72,6 +76,7 @@ Android Automotive：${isAutomotive ? "是" : "否/厂商未声明"}
 车机当前整屏：${isHostFullScreen ? "是" : "否"}
 当前窗口：${width.toStringAsFixed(0)} × ${height.toStringAsFixed(0)} dp
 最大窗口：${maximumWidth.toStringAsFixed(0)} × ${maximumHeight.toStringAsFixed(0)} dp
+窗口宽度占比：${(widthRatio * 100).toStringAsFixed(0)}%
 系统安全区：左 ${insetLeft.toStringAsFixed(0)} / 上 ${insetTop.toStringAsFixed(0)} / 右 ${insetRight.toStringAsFixed(0)} / 下 ${insetBottom.toStringAsFixed(0)} dp''';
 }
 

@@ -1017,7 +1017,15 @@ ${error?.stackTrace}''');
     if (state == AppLifecycleState.resumed) {
       Log.d("返回前台");
       isBackground = false;
+      syncCarSystemUi();
     }
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Vehicle split/full transitions are delivered as window metric changes,
+    // even though this OEM does not set Android's standard multi-window flag.
+    syncCarSystemUi();
   }
 
   // 用于启动开播时长计算和更新的函数
@@ -1063,4 +1071,3 @@ ${error?.stackTrace}''');
     super.onClose();
   }
 }
-

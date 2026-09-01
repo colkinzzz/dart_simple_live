@@ -2,6 +2,7 @@ package com.xycz.simple_live
 
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.DisplayMetrics
 import android.view.WindowInsets
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -25,6 +26,21 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun readPhysicalDisplayMetrics(): DisplayMetrics {
+        val metrics = DisplayMetrics()
+        val targetDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display
+        } else {
+            windowManager.defaultDisplay
+        }
+        targetDisplay?.getRealMetrics(metrics)
+        if (metrics.widthPixels <= 0 || metrics.heightPixels <= 0) {
+            windowManager.defaultDisplay.getRealMetrics(metrics)
+        }
+        return metrics
+    }
+
     private fun readWindowState(): Map<String, Any> {
         val density = resources.displayMetrics.density.toDouble().coerceAtLeast(1.0)
         val isMultiWindow = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
@@ -32,61 +48,57 @@ class MainActivity : FlutterActivity() {
         val isAutomotive = packageManager.hasSystemFeature(
             PackageManager.FEATURE_AUTOMOTIVE,
         )
+        val physicalMetrics = readPhysicalDisplayMetrics()
+        val physicalWidth = physicalMetrics.widthPixels.coerceAtLeast(1)
+        val physicalHeight = physicalMetrics.heightPixels.coerceAtLeast(1)
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            val width = resources.displayMetrics.widthPixels / density
-            val height = resources.displayMetrics.heightPixels / density
-            return mapOf(
-                "isAutomotive" to isAutomotive,
-                "isInMultiWindowMode" to isMultiWindow,
-                // Android 10 and below cannot reliably compare current and
-                // maximum window bounds. Prefer keeping OEM bars visible over
-                // accidentally promoting a vendor split window.
-                "isHostFullScreen" to false,
-                "width" to width,
-                "height" to height,
-                "maximumWidth" to width,
-                "maximumHeight" to height,
-                "insetLeft" to 0.0,
-                "insetTop" to 0.0,
-                "insetRight" to 0.0,
-                "insetBottom" to 0.0,
-            )
-        }
-
-        val currentMetrics = windowManager.currentWindowMetrics
-        val maximumMetrics = windowManager.maximumWindowMetrics
-        val currentBounds = currentMetrics.bounds
-        val maximumBounds = maximumMetrics.bounds
-        val widthRatio = if (maximumBounds.width() > 0) {
-            currentBounds.width().toDouble() / maximumBounds.width()
+        val currentWidth: Int
+        val currentHeight: Int
+        var insetLeft = 0
+        var insetTop = 0
+        var insetRight = 0
+        var insetBottom = 0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val currentMetrics = windowManager.currentWindowMetrics
+            val currentBounds = currentMetrics.bounds
+            currentWidth = currentBounds.width()
+            currentHeight = currentBounds.height()
+            val insetTypes = WindowInsets.Type.statusBars() or
+                WindowInsets.Type.navigationBars() or
+                WindowInsets.Type.displayCutout() or
+                WindowInsets.Type.tappableElement() or
+                WindowInsets.Type.mandatorySystemGestures()
+            val insets = currentMetrics.windowInsets.getInsetsIgnoringVisibility(insetTypes)
+            insetLeft = insets.left
+            insetTop = insets.top
+            insetRight = insets.right
+            insetBottom = insets.bottom
         } else {
-            0.0
+            currentWidth = window.decorView.width.takeIf { it > 0 }
+                ?: resources.displayMetrics.widthPixels
+            currentHeight = window.decorView.height.takeIf { it > 0 }
+                ?: resources.displayMetrics.heightPixels
         }
 
-        // Some car launchers implement split screen without reporting Android's
-        // multi-window flag. Comparing the current and maximum bounds keeps an
-        // in-app fullscreen action from promoting a 2/3 window to the full display.
-        val isHostFullScreen = !isMultiWindow && widthRatio >= 0.90
-        val insetTypes = WindowInsets.Type.statusBars() or
-            WindowInsets.Type.navigationBars() or
-            WindowInsets.Type.displayCutout() or
-            WindowInsets.Type.tappableElement() or
-            WindowInsets.Type.mandatorySystemGestures()
-        val insets = currentMetrics.windowInsets.getInsetsIgnoringVisibility(insetTypes)
+        // This OEM's 1/3 + 2/3 layout does not set isInMultiWindowMode, and
+        // maximumWindowMetrics may describe only the current task. Comparing
+        // against the physical panel reliably separates ~0.67 split from 1.0.
+        val widthRatio = currentWidth.toDouble() / physicalWidth
+        val isHostFullScreen = widthRatio >= 0.90
 
         return mapOf(
             "isAutomotive" to isAutomotive,
             "isInMultiWindowMode" to isMultiWindow,
             "isHostFullScreen" to isHostFullScreen,
-            "width" to currentBounds.width() / density,
-            "height" to currentBounds.height() / density,
-            "maximumWidth" to maximumBounds.width() / density,
-            "maximumHeight" to maximumBounds.height() / density,
-            "insetLeft" to insets.left / density,
-            "insetTop" to insets.top / density,
-            "insetRight" to insets.right / density,
-            "insetBottom" to insets.bottom / density,
+            "width" to currentWidth / density,
+            "height" to currentHeight / density,
+            "maximumWidth" to physicalWidth / density,
+            "maximumHeight" to physicalHeight / density,
+            "widthRatio" to widthRatio,
+            "insetLeft" to insetLeft / density,
+            "insetTop" to insetTop / density,
+            "insetRight" to insetRight / density,
+            "insetBottom" to insetBottom / density,
         )
     }
 }
