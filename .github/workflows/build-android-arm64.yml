@@ -2,6 +2,13 @@ name: Build Android arm64 APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - codex/car-window-adaptation
+    paths:
+      - "simple_live_app/**"
+      - "simple_live_core/**"
+      - ".github/workflows/build-android-arm64.yml"
 
 jobs:
   build:
@@ -53,8 +60,15 @@ jobs:
           cd simple_live_app
           flutter build apk --release --target-platform android-arm64 --split-per-abi
 
+      - name: Create checksum
+        run: |
+          cd simple_live_app/build/app/outputs/flutter-apk
+          sha256sum app-arm64-v8a-release.apk > app-arm64-v8a-release.apk.sha256
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: simple-live-arm64-v8a-apk
-          path: simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          name: simple-live-car-arm64-v8a-apk
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk.sha256

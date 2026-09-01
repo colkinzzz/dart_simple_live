@@ -97,7 +97,7 @@ class LiveRoomPage extends GetView<LiveRoomController> {
             ),
           );
         } else {
-          return buildPageUI();
+          return buildPageUI(context);
         }
       },
     );
@@ -111,21 +111,26 @@ class LiveRoomPage extends GetView<LiveRoomController> {
     );
   }
 
-  Widget buildPageUI() {
-    return OrientationBuilder(
-      builder: (context, orientation) {
-        return Scaffold(
-          appBar: AppBar(
-            title: Obx(
-              () => Text(controller.detail.value?.title ?? "直播间"),
-            ),
-            actions: buildAppbarActions(context),
-          ),
-          body: orientation == Orientation.portrait
-              ? buildPhoneUI(context)
-              : buildTabletUI(context),
-        );
-      },
+  Widget buildPageUI(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Obx(
+          () => Text(controller.detail.value?.title ?? "直播间"),
+        ),
+        actions: buildAppbarActions(context),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Use the Activity's current bounds instead of physical display
+          // orientation. A car's right-side 2/3 window is landscape but should
+          // not automatically receive a full tablet layout.
+          final useWideLayout = constraints.maxWidth >= 720 &&
+              constraints.maxWidth >= constraints.maxHeight * 1.15;
+          return useWideLayout
+              ? buildTabletUI(context)
+              : buildPhoneUI(context);
+        },
+      ),
     );
   }
 

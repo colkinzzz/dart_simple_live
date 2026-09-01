@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:simple_live_app/app/app_style.dart';
 import 'package:simple_live_app/app/controller/app_settings_controller.dart';
@@ -8,6 +9,7 @@ import 'package:simple_live_app/widgets/settings/settings_card.dart';
 import 'package:simple_live_app/widgets/settings/settings_menu.dart';
 import 'package:simple_live_app/widgets/settings/settings_number.dart';
 import 'package:simple_live_app/widgets/settings/settings_switch.dart';
+import 'package:simple_live_app/services/car_window_service.dart';
 
 class PlaySettingsPage extends GetView<AppSettingsController> {
   const PlaySettingsPage({Key? key}) : super(key: key);
@@ -112,6 +114,103 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
               ],
             ),
           ),
+          if (Platform.isAndroid)
+            Padding(
+              padding: AppStyle.edgeInsetsA12.copyWith(top: 24),
+              child: Text(
+                "车机适配",
+                style: Get.textTheme.titleSmall,
+              ),
+            ),
+          if (Platform.isAndroid)
+            SettingsCard(
+              child: Obx(
+                () => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SettingsSwitch(
+                      title: "车机模式",
+                      subtitle: "应用内全屏只铺满当前窗口，不强制车机退出分屏",
+                      value: controller.carMode.value,
+                      onChanged: (e) async {
+                        controller.setCarMode(e);
+                        if (e) {
+                          await SystemChrome.setEnabledSystemUIMode(
+                            SystemUiMode.manual,
+                            overlays: SystemUiOverlay.values,
+                          );
+                        } else {
+                          await SystemChrome.setEnabledSystemUIMode(
+                            SystemUiMode.edgeToEdge,
+                          );
+                        }
+                      },
+                    ),
+                    if (controller.carMode.value) ...[
+                      AppStyle.divider,
+                      SettingsSwitch(
+                        title: "双全屏时隐藏系统栏",
+                        subtitle: "仅当检测到车机已是整屏且播放器全屏时尝试隐藏",
+                        value: controller.carHideSystemBars.value,
+                        onChanged: controller.setCarHideSystemBars,
+                      ),
+                      AppStyle.divider,
+                      SettingsNumber(
+                        title: "顶部额外安全区",
+                        subtitle: "系统栏仍遮挡或无法点击时逐步增加",
+                        value: controller.carTopSafePadding.value,
+                        min: 0,
+                        max: 160,
+                        step: 4,
+                        unit: "dp",
+                        onChanged: controller.setCarTopSafePadding,
+                      ),
+                      AppStyle.divider,
+                      SettingsNumber(
+                        title: "底部额外安全区",
+                        subtitle: "空调控制条遮挡内容时逐步增加",
+                        value: controller.carBottomSafePadding.value,
+                        min: 0,
+                        max: 160,
+                        step: 4,
+                        unit: "dp",
+                        onChanged: controller.setCarBottomSafePadding,
+                      ),
+                      AppStyle.divider,
+                      ListTile(
+                        minTileHeight: 56,
+                        title: const Text("检测当前窗口"),
+                        subtitle: const Text("查看分屏、窗口尺寸和系统安全区"),
+                        trailing: const Icon(Icons.monitor_outlined),
+                        onTap: () async {
+                          final state =
+                              await CarWindowService.getWindowState();
+                          if (!context.mounted) return;
+                          showDialog<void>(
+                            context: context,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text("车机窗口状态"),
+                              content: SelectableText(
+                                state.supported
+                                    ? state.diagnosticText
+                                    : "无法读取窗口状态，请重新启动应用后再试。",
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(),
+                                  child: const Text("确定"),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           Padding(
             padding: AppStyle.edgeInsetsA12.copyWith(top: 24),
             child: Text(

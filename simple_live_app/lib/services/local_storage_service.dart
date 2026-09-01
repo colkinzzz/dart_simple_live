@@ -105,6 +105,18 @@ class LocalStorageService extends GetxService {
   /// 自动全屏
   static const String kAutoFullScreen = "AutoFullScreen";
 
+  /// 车机模式（车机专用构建默认开启）
+  static const String kCarMode = "CarMode";
+
+  /// 仅在车机已经处于整屏且播放器全屏时隐藏系统栏
+  static const String kCarHideSystemBars = "CarHideSystemBars";
+
+  /// 车机顶部额外安全区（逻辑像素）
+  static const String kCarTopSafePadding = "CarTopSafePadding";
+
+  /// 车机底部额外安全区（逻辑像素）
+  static const String kCarBottomSafePadding = "CarBottomSafePadding";
+
   /// 显示SC
   static const String kPlayerShowSuperChat = "PlayerShowSuperChat";
 

@@ -83,6 +83,15 @@ class AppSettingsController extends GetxController {
     autoFullScreen.value = LocalStorageService.instance
         .getValue(LocalStorageService.kAutoFullScreen, false);
 
+    carMode.value = LocalStorageService.instance
+        .getValue(LocalStorageService.kCarMode, true);
+    carHideSystemBars.value = LocalStorageService.instance
+        .getValue(LocalStorageService.kCarHideSystemBars, true);
+    carTopSafePadding.value = LocalStorageService.instance
+        .getValue(LocalStorageService.kCarTopSafePadding, 0);
+    carBottomSafePadding.value = LocalStorageService.instance
+        .getValue(LocalStorageService.kCarBottomSafePadding, 0);
+
     // ignore: invalid_use_of_protected_member
     shieldList.value = LocalStorageService.instance.shieldBox.values.toSet();
 
@@ -371,6 +380,33 @@ class AppSettingsController extends GetxController {
     autoFullScreen.value = e;
     LocalStorageService.instance
         .setValue(LocalStorageService.kAutoFullScreen, e);
+  }
+
+  var carMode = true.obs;
+  void setCarMode(bool e) {
+    carMode.value = e;
+    LocalStorageService.instance.setValue(LocalStorageService.kCarMode, e);
+  }
+
+  var carHideSystemBars = true.obs;
+  void setCarHideSystemBars(bool e) {
+    carHideSystemBars.value = e;
+    LocalStorageService.instance
+        .setValue(LocalStorageService.kCarHideSystemBars, e);
+  }
+
+  var carTopSafePadding = 0.obs;
+  void setCarTopSafePadding(int e) {
+    carTopSafePadding.value = e;
+    LocalStorageService.instance
+        .setValue(LocalStorageService.kCarTopSafePadding, e);
+  }
+
+  var carBottomSafePadding = 0.obs;
+  void setCarBottomSafePadding(int e) {
+    carBottomSafePadding.value = e;
+    LocalStorageService.instance
+        .setValue(LocalStorageService.kCarBottomSafePadding, e);
   }
 
   var playershowSuperChat = true.obs;

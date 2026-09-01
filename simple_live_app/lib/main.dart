@@ -48,7 +48,14 @@ void main() async {
   );
   //初始化服务
   await initServices();
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  if (Platform.isAndroid && AppSettingsController.instance.carMode.value) {
+    await SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
+  } else {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  }
   //设置状态栏为透明
   SystemUiOverlayStyle systemUiOverlayStyle = const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -216,27 +223,31 @@ class MyApp extends StatelessWidget {
           loadingBuilder: ((msg) => const AppLoaddingWidget()),
           //字体大小不跟随系统变化
           builder: (context, child) {
-            // Fix for HyperOS windowed-mode Flutter bug:
-            // - Values > 50 indicate the bug (windowed mode on HyperOS)
-            // - Values == 0 are valid for fullscreen/immersive mode and must NOT be treated as abnormal
-            const fallbackPadding = EdgeInsets.only(top: 25, bottom: 35);
-            const maxNormalPadding = 50.0;
+            return Obx(() {
+              final settings = AppSettingsController.instance;
+              final isCarMode = Platform.isAndroid && settings.carMode.value;
+              final mediaQueryData = MediaQuery.of(context);
 
-            final mediaQueryData = MediaQuery.of(context);
-            final hasAbnormalPadding = mediaQueryData.viewPadding.top > maxNormalPadding;
+              // Keep the old HyperOS workaround for phone/tablet builds. Car
+              // systems often report a legitimately large top inset, so
+              // truncating it to 25dp makes visible controls sit underneath the
+              // OEM status bar where touches are intercepted by the system.
+              const fallbackPadding = EdgeInsets.only(top: 25, bottom: 35);
+              const maxNormalPadding = 50.0;
+              final hasAbnormalPadding = !isCarMode &&
+                  mediaQueryData.viewPadding.top > maxNormalPadding;
+              final fixedMediaQueryData = hasAbnormalPadding
+                  ? mediaQueryData.copyWith(
+                      viewPadding: fallbackPadding,
+                      padding: fallbackPadding,
+                      textScaler: const TextScaler.linear(1.0),
+                    )
+                  : mediaQueryData.copyWith(
+                      textScaler: const TextScaler.linear(1.0),
+                    );
 
-            final fixedMediaQueryData = hasAbnormalPadding
-                ? mediaQueryData.copyWith(
-                    viewPadding: fallbackPadding,
-                    padding: fallbackPadding,
-                    textScaler: const TextScaler.linear(1.0),
-                  )
-                : mediaQueryData.copyWith(textScaler: const TextScaler.linear(1.0));
-
-            return MediaQuery(
-              data: fixedMediaQueryData,
-              child: Stack(
-              children: [
+              Widget appContent = Stack(
+                children: [
                 //侧键返回
                 RawGestureDetector(
                   excludeFromSemantics: true,
@@ -298,9 +309,26 @@ class MyApp extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-            ),
-            );
+                ],
+              );
+
+              if (isCarMode) {
+                appContent = SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: settings.carTopSafePadding.value.toDouble(),
+                      bottom: settings.carBottomSafePadding.value.toDouble(),
+                    ),
+                    child: appContent,
+                  ),
+                );
+              }
+
+              return MediaQuery(
+                data: fixedMediaQueryData,
+                child: appContent,
+              );
+            });
           },
         ),
       );
