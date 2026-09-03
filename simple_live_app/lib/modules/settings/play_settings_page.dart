@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simple_live_app/app/app_style.dart';
 import 'package:simple_live_app/app/controller/app_settings_controller.dart';
-import 'package:simple_live_app/modules/settings/car_diagnostics_page.dart';
 import 'package:simple_live_app/widgets/settings/settings_card.dart';
 import 'package:simple_live_app/widgets/settings/settings_menu.dart';
 import 'package:simple_live_app/widgets/settings/settings_number.dart';
@@ -157,16 +156,6 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
                         onChanged: controller.setCarBottomSafePadding,
                       ),
                     ],
-                    AppStyle.divider,
-                    ListTile(
-                      minTileHeight: 64,
-                      title: const Text("设备与窗口诊断"),
-                      subtitle: const Text("采集手机/车机显示、窗口、系统栏和适配信息"),
-                      trailing: const Icon(Icons.monitor_heart_outlined),
-                      onTap: () => Get.to<void>(
-                        () => const CarDiagnosticsPage(),
-                      ),
-                    ),
                   ],
                 ),
               ),

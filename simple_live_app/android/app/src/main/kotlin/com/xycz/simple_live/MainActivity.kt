@@ -1,23 +1,34 @@
 package com.xycz.simple_live
 
-import android.app.ActivityManager
-import android.content.Context
 import android.content.pm.PackageManager
-import android.content.res.Configuration
-import android.graphics.Rect
 import android.os.Build
 import android.util.DisplayMetrics
 import android.view.Display
-import android.view.ViewConfiguration
 import android.view.WindowInsets
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
+/**
+ * The vehicle launcher owns the Activity window. This channel only reports
+ * its current bounds; it never requests a different window or orientation.
+ */
 class MainActivity : FlutterActivity() {
     companion object {
         private const val CAR_WINDOW_CHANNEL = "com.xycz.simple_live/car_window"
+        private const val FULL_SIZE_THRESHOLD = 0.90
+        private const val SPLIT_SIZE_THRESHOLD = 0.86
+        private const val MAX_FULL_SIZE_RATIO = 1.10
     }
+
+    private data class PhysicalDisplay(
+        val width: Int,
+        val height: Int,
+        val reliable: Boolean,
+    )
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -27,98 +38,59 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getWindowState" -> result.success(readWindowState())
-                "getDiagnostics" -> result.success(readWindowState())
                 else -> result.notImplemented()
             }
         }
     }
 
+    /**
+     * Display.Mode is the only modern API here that describes the panel rather
+     * than the current task. getRealMetrics is retained only as an
+     * informational/legacy fallback and is deliberately not trusted for the
+     * full-screen decision on Android M and newer.
+     */
     @Suppress("DEPRECATION")
-    private fun readPhysicalDisplayMetrics(): DisplayMetrics {
+    private fun readPhysicalDisplay(targetDisplay: Display?): PhysicalDisplay? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val mode = targetDisplay?.mode
+            if (mode != null && mode.physicalWidth > 0 && mode.physicalHeight > 0) {
+                return PhysicalDisplay(
+                    width = mode.physicalWidth,
+                    height = mode.physicalHeight,
+                    reliable = true,
+                )
+            }
+        }
+
         val metrics = DisplayMetrics()
+        targetDisplay?.getRealMetrics(metrics)
+        return if (metrics.widthPixels > 0 && metrics.heightPixels > 0) {
+            PhysicalDisplay(
+                width = metrics.widthPixels,
+                height = metrics.heightPixels,
+                reliable = false,
+            )
+        } else {
+            null
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun readWindowState(): Map<String, Any> {
+        val density = resources.displayMetrics.density.toDouble().coerceAtLeast(1.0)
         val targetDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             display
         } else {
             windowManager.defaultDisplay
         }
-        targetDisplay?.getRealMetrics(metrics)
-        if (metrics.widthPixels <= 0 || metrics.heightPixels <= 0) {
-            windowManager.defaultDisplay.getRealMetrics(metrics)
-        }
-        return metrics
-    }
-
-    private fun addInsets(
-        values: MutableMap<String, Any>,
-        prefix: String,
-        left: Int,
-        top: Int,
-        right: Int,
-        bottom: Int,
-        density: Double,
-    ) {
-        values["${prefix}Left"] = left / density
-        values["${prefix}Top"] = top / density
-        values["${prefix}Right"] = right / density
-        values["${prefix}Bottom"] = bottom / density
-        values["${prefix}LeftPx"] = left
-        values["${prefix}TopPx"] = top
-        values["${prefix}RightPx"] = right
-        values["${prefix}BottomPx"] = bottom
-    }
-
-    private fun orientationName(orientation: Int): String = when (orientation) {
-        Configuration.ORIENTATION_LANDSCAPE -> "landscape"
-        Configuration.ORIENTATION_PORTRAIT -> "portrait"
-        Configuration.ORIENTATION_SQUARE -> "square"
-        else -> "undefined"
-    }
-
-    private fun rotationName(rotation: Int): String = when (rotation) {
-        Display.ROTATION_90 -> "90"
-        Display.ROTATION_180 -> "180"
-        Display.ROTATION_270 -> "270"
-        else -> "0"
-    }
-
-    private fun uiModeTypeName(uiModeType: Int): String = when (uiModeType) {
-        Configuration.UI_MODE_TYPE_CAR -> "car"
-        Configuration.UI_MODE_TYPE_DESK -> "desk"
-        Configuration.UI_MODE_TYPE_TELEVISION -> "television"
-        Configuration.UI_MODE_TYPE_WATCH -> "watch"
-        Configuration.UI_MODE_TYPE_VR_HEADSET -> "vr_headset"
-        Configuration.UI_MODE_TYPE_APPLIANCE -> "appliance"
-        Configuration.UI_MODE_TYPE_NORMAL -> "normal"
-        else -> "undefined"
-    }
-
-    private fun colorHex(color: Int): String =
-        String.format("#%08X", color)
-
-    @Suppress("DEPRECATION")
-    private fun readWindowState(): Map<String, Any> {
-        val resourceMetrics = resources.displayMetrics
-        val density = resourceMetrics.density.toDouble().coerceAtLeast(1.0)
-        val configuration = resources.configuration
+        val physical = readPhysicalDisplay(targetDisplay)
+        val physicalWidth = physical?.width ?: 0
+        val physicalHeight = physical?.height ?: 0
         val isMultiWindow = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
             isInMultiWindowMode
         val isAutomotive = packageManager.hasSystemFeature(
             PackageManager.FEATURE_AUTOMOTIVE,
         )
-        val physicalMetrics = readPhysicalDisplayMetrics()
-        val physicalWidth = physicalMetrics.widthPixels.coerceAtLeast(1)
-        val physicalHeight = physicalMetrics.heightPixels.coerceAtLeast(1)
-        val targetDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            display
-        } else {
-            @Suppress("DEPRECATION")
-            windowManager.defaultDisplay
-        }
-        val displayMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            targetDisplay?.mode
-        } else {
-            null
-        }
 
         val currentWidth: Int
         val currentHeight: Int
@@ -126,24 +98,19 @@ class MainActivity : FlutterActivity() {
         var currentBoundsTop = 0
         var currentBoundsRight = 0
         var currentBoundsBottom = 0
-        var maximumWindowWidth = physicalWidth
-        var maximumWindowHeight = physicalHeight
         var insetLeft = 0
         var insetTop = 0
         var insetRight = 0
         var insetBottom = 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val currentMetrics = windowManager.currentWindowMetrics
-            val currentBounds = currentMetrics.bounds
-            currentWidth = currentBounds.width()
-            currentHeight = currentBounds.height()
-            currentBoundsLeft = currentBounds.left
-            currentBoundsTop = currentBounds.top
-            currentBoundsRight = currentBounds.right
-            currentBoundsBottom = currentBounds.bottom
-            val maximumBounds = windowManager.maximumWindowMetrics.bounds
-            maximumWindowWidth = maximumBounds.width()
-            maximumWindowHeight = maximumBounds.height()
+            val bounds = currentMetrics.bounds
+            currentWidth = bounds.width()
+            currentHeight = bounds.height()
+            currentBoundsLeft = bounds.left
+            currentBoundsTop = bounds.top
+            currentBoundsRight = bounds.right
+            currentBoundsBottom = bounds.bottom
             val insetTypes = WindowInsets.Type.statusBars() or
                 WindowInsets.Type.navigationBars() or
                 WindowInsets.Type.displayCutout() or
@@ -163,47 +130,75 @@ class MainActivity : FlutterActivity() {
             currentBoundsBottom = currentHeight
         }
 
-        // This OEM's 1/3 + 2/3 layout does not set isInMultiWindowMode, and
-        // maximumWindowMetrics may describe only the current task. Comparing
-        // against the physical panel reliably separates ~0.67 split from 1.0.
-        val widthRatio = currentWidth.toDouble() / physicalWidth
-        val isHostFullScreen = widthRatio >= 0.90
+        // A full host window must fill the reliable panel in both dimensions
+        // and start at the display origin. The origin check matters on car
+        // launchers where a right-hand pane can look like a full-width virtual
+        // display to getRealMetrics().
+        val directWidthRatio = if (physicalWidth > 0) {
+            currentWidth.toDouble() / physicalWidth
+        } else {
+            0.0
+        }
+        val directHeightRatio = if (physicalHeight > 0) {
+            currentHeight.toDouble() / physicalHeight
+        } else {
+            0.0
+        }
+        val swappedWidthRatio = if (physicalHeight > 0) {
+            currentWidth.toDouble() / physicalHeight
+        } else {
+            0.0
+        }
+        val swappedHeightRatio = if (physicalWidth > 0) {
+            currentHeight.toDouble() / physicalWidth
+        } else {
+            0.0
+        }
+        val useSwappedPanel = min(swappedWidthRatio, swappedHeightRatio) >
+            min(directWidthRatio, directHeightRatio)
+        val panelWidth = if (useSwappedPanel) physicalHeight else physicalWidth
+        val panelHeight = if (useSwappedPanel) physicalWidth else physicalHeight
+        val widthRatio = if (panelWidth > 0) {
+            currentWidth.toDouble() / panelWidth
+        } else {
+            0.0
+        }
+        val heightRatio = if (panelHeight > 0) {
+            currentHeight.toDouble() / panelHeight
+        } else {
+            0.0
+        }
+        val edgeTolerance = max(12, max(panelWidth, panelHeight) / 100)
+        val startsAtDisplayOrigin =
+            abs(currentBoundsLeft) <= edgeTolerance &&
+                abs(currentBoundsTop) <= edgeTolerance
+        val fillsReliablePanel = physical?.reliable == true &&
+            widthRatio >= FULL_SIZE_THRESHOLD &&
+            heightRatio >= FULL_SIZE_THRESHOLD &&
+            widthRatio <= MAX_FULL_SIZE_RATIO &&
+            heightRatio <= MAX_FULL_SIZE_RATIO &&
+            startsAtDisplayOrigin
+        val hasReliableConstrainedBounds = physical?.reliable == true &&
+            (widthRatio < SPLIT_SIZE_THRESHOLD ||
+                heightRatio < SPLIT_SIZE_THRESHOLD ||
+                !startsAtDisplayOrigin)
+        val hostWindowState = when {
+            isMultiWindow -> "split"
+            fillsReliablePanel -> "full"
+            hasReliableConstrainedBounds -> "split"
+            else -> "unknown"
+        }
 
-        val uiModeType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
-        val nightMode = configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        val viewConfiguration = ViewConfiguration.get(this)
-        val decorLocationOnScreen = IntArray(2)
-        val decorLocationInWindow = IntArray(2)
-        window.decorView.getLocationOnScreen(decorLocationOnScreen)
-        window.decorView.getLocationInWindow(decorLocationInWindow)
-        val visibleDisplayFrame = Rect()
-        window.decorView.getWindowVisibleDisplayFrame(visibleDisplayFrame)
-
-        val values = mutableMapOf<String, Any>(
-            "diagnosticSchema" to 1,
-            "sdkInt" to Build.VERSION.SDK_INT,
-            "targetSdk" to applicationInfo.targetSdkVersion,
+        return mapOf(
             "isAutomotive" to isAutomotive,
-            "hasTouchscreen" to packageManager.hasSystemFeature(
-                PackageManager.FEATURE_TOUCHSCREEN,
-            ),
-            "hasLeanback" to packageManager.hasSystemFeature(
-                PackageManager.FEATURE_LEANBACK,
-            ),
             "isInMultiWindowMode" to isMultiWindow,
-            "isInPictureInPictureMode" to (
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-                    isInPictureInPictureMode
-                ),
-            "isHostFullScreen" to isHostFullScreen,
+            "hostWindowState" to hostWindowState,
             "width" to currentWidth / density,
             "height" to currentHeight / density,
-            "maximumWidth" to physicalWidth / density,
-            "maximumHeight" to physicalHeight / density,
+            "maximumWidth" to if (panelWidth > 0) panelWidth / density else 0,
+            "maximumHeight" to if (panelHeight > 0) panelHeight / density else 0,
             "widthRatio" to widthRatio,
+            "heightRatio" to heightRatio,
             "currentWidthPx" to currentWidth,
             "currentHeightPx" to currentHeight,
             "currentBoundsLeftPx" to currentBoundsLeft,
@@ -212,163 +207,11 @@ class MainActivity : FlutterActivity() {
             "currentBoundsBottomPx" to currentBoundsBottom,
             "physicalWidthPx" to physicalWidth,
             "physicalHeightPx" to physicalHeight,
-            "maximumWindowWidthPx" to maximumWindowWidth,
-            "maximumWindowHeightPx" to maximumWindowHeight,
-            "decorWidthPx" to window.decorView.width,
-            "decorHeightPx" to window.decorView.height,
-            "decorLocationOnScreenXPx" to decorLocationOnScreen[0],
-            "decorLocationOnScreenYPx" to decorLocationOnScreen[1],
-            "decorLocationInWindowXPx" to decorLocationInWindow[0],
-            "decorLocationInWindowYPx" to decorLocationInWindow[1],
-            "visibleDisplayFrameLeftPx" to visibleDisplayFrame.left,
-            "visibleDisplayFrameTopPx" to visibleDisplayFrame.top,
-            "visibleDisplayFrameRightPx" to visibleDisplayFrame.right,
-            "visibleDisplayFrameBottomPx" to visibleDisplayFrame.bottom,
+            "physicalDisplayReliable" to (physical?.reliable == true),
             "insetLeft" to insetLeft / density,
             "insetTop" to insetTop / density,
             "insetRight" to insetRight / density,
             "insetBottom" to insetBottom / density,
-            "density" to resourceMetrics.density.toDouble(),
-            "densityDpi" to resourceMetrics.densityDpi,
-            "scaledDensity" to resourceMetrics.scaledDensity.toDouble(),
-            "fontScale" to configuration.fontScale.toDouble(),
-            "xdpi" to physicalMetrics.xdpi.toDouble(),
-            "ydpi" to physicalMetrics.ydpi.toDouble(),
-            "screenWidthDp" to configuration.screenWidthDp,
-            "screenHeightDp" to configuration.screenHeightDp,
-            "smallestScreenWidthDp" to configuration.smallestScreenWidthDp,
-            "orientation" to orientationName(configuration.orientation),
-            "rotation" to rotationName(targetDisplay?.rotation ?: 0),
-            "displayName" to (targetDisplay?.name ?: "unknown"),
-            "refreshRate" to (targetDisplay?.refreshRate?.toDouble() ?: 0.0),
-            "displayModeWidthPx" to (displayMode?.physicalWidth ?: 0),
-            "displayModeHeightPx" to (displayMode?.physicalHeight ?: 0),
-            "displayModeRefreshRate" to (
-                displayMode?.refreshRate?.toDouble() ?: 0.0
-                ),
-            "uiModeType" to uiModeTypeName(uiModeType),
-            "nightMode" to when (nightMode) {
-                Configuration.UI_MODE_NIGHT_YES -> "night"
-                Configuration.UI_MODE_NIGHT_NO -> "day"
-                else -> "undefined"
-            },
-            "requestedOrientation" to requestedOrientation,
-            "windowFlags" to "0x${Integer.toHexString(window.attributes.flags)}",
-            "softInputMode" to "0x${Integer.toHexString(window.attributes.softInputMode)}",
-            "systemUiVisibility" to "0x${Integer.toHexString(window.decorView.systemUiVisibility)}",
-            "statusBarColor" to colorHex(window.statusBarColor),
-            "navigationBarColor" to colorHex(window.navigationBarColor),
-            "memoryClassMb" to activityManager.memoryClass,
-            "largeMemoryClassMb" to activityManager.largeMemoryClass,
-            "availableMemoryMb" to memoryInfo.availMem / 1024 / 1024,
-            "totalMemoryMb" to memoryInfo.totalMem / 1024 / 1024,
-            "isLowMemory" to memoryInfo.lowMemory,
-            "isLowRamDevice" to activityManager.isLowRamDevice,
-            "availableProcessors" to Runtime.getRuntime().availableProcessors(),
-            "touchSlopPx" to viewConfiguration.scaledTouchSlop,
-            "doubleTapSlopPx" to viewConfiguration.scaledDoubleTapSlop,
-            "edgeSlopPx" to viewConfiguration.scaledEdgeSlop,
-            "minimumFlingVelocityPx" to viewConfiguration.scaledMinimumFlingVelocity,
-            "maximumFlingVelocityPx" to viewConfiguration.scaledMaximumFlingVelocity,
         )
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            values["layoutInDisplayCutoutMode"] =
-                window.attributes.layoutInDisplayCutoutMode
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val windowInsets = windowManager.currentWindowMetrics.windowInsets
-            val statusBarInsets =
-                windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars())
-            addInsets(
-                values,
-                "statusBarInset",
-                statusBarInsets.left,
-                statusBarInsets.top,
-                statusBarInsets.right,
-                statusBarInsets.bottom,
-                density,
-            )
-            val navigationBarInsets =
-                windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
-            addInsets(
-                values,
-                "navigationBarInset",
-                navigationBarInsets.left,
-                navigationBarInsets.top,
-                navigationBarInsets.right,
-                navigationBarInsets.bottom,
-                density,
-            )
-            val displayCutoutInsets =
-                windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout())
-            addInsets(
-                values,
-                "displayCutoutInset",
-                displayCutoutInsets.left,
-                displayCutoutInsets.top,
-                displayCutoutInsets.right,
-                displayCutoutInsets.bottom,
-                density,
-            )
-            val tappableInsets =
-                windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.tappableElement())
-            addInsets(
-                values,
-                "tappableInset",
-                tappableInsets.left,
-                tappableInsets.top,
-                tappableInsets.right,
-                tappableInsets.bottom,
-                density,
-            )
-            val systemGestureInsets =
-                windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemGestures())
-            addInsets(
-                values,
-                "systemGestureInset",
-                systemGestureInsets.left,
-                systemGestureInsets.top,
-                systemGestureInsets.right,
-                systemGestureInsets.bottom,
-                density,
-            )
-            val mandatoryGestureInsets = windowInsets.getInsetsIgnoringVisibility(
-                WindowInsets.Type.mandatorySystemGestures(),
-            )
-            addInsets(
-                values,
-                "mandatoryGestureInset",
-                mandatoryGestureInsets.left,
-                mandatoryGestureInsets.top,
-                mandatoryGestureInsets.right,
-                mandatoryGestureInsets.bottom,
-                density,
-            )
-            val imeInsets = windowInsets.getInsets(WindowInsets.Type.ime())
-            addInsets(
-                values,
-                "imeInset",
-                imeInsets.left,
-                imeInsets.top,
-                imeInsets.right,
-                imeInsets.bottom,
-                density,
-            )
-            values["isStatusBarVisible"] =
-                windowInsets.isVisible(WindowInsets.Type.statusBars())
-            values["isNavigationBarVisible"] =
-                windowInsets.isVisible(WindowInsets.Type.navigationBars())
-            values["isImeVisible"] = windowInsets.isVisible(WindowInsets.Type.ime())
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            values["statusBarContrastEnforced"] = window.isStatusBarContrastEnforced
-            values["navigationBarContrastEnforced"] =
-                window.isNavigationBarContrastEnforced
-        }
-
-        return values
     }
 }
