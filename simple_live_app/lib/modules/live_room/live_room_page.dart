@@ -106,7 +106,8 @@ class LiveRoomPage extends GetView<LiveRoomController> {
               controller.exitFull();
             },
             child: Scaffold(
-              body: buildMediaPlayer(),
+              backgroundColor: Colors.black,
+              body: buildFullScreenMediaPlayer(context),
             ),
           );
         } else {
@@ -256,7 +257,34 @@ class LiveRoomPage extends GetView<LiveRoomController> {
     );
   }
 
-  Widget buildMediaPlayer() {
+  Widget buildFullScreenMediaPlayer(BuildContext context) {
+    final settings = AppSettingsController.instance;
+    final useVisibleCarViewport = Platform.isAndroid &&
+        settings.carMode.value &&
+        controller.carHostWindowState.value != 'full';
+    if (!useVisibleCarViewport) {
+      return buildMediaPlayer();
+    }
+
+    final bottomInset = _bottomInteractiveInset(context);
+    if (bottomInset <= 0) {
+      return buildMediaPlayer();
+    }
+
+    // In a split vehicle window the Activity extends behind the OEM bottom
+    // bar. Centre BoxFit.contain inside the actually visible pane so its top
+    // and bottom letterboxing stay symmetric. The controls skip their own
+    // bottom inset below, keeping their existing physical screen position.
+    return ColoredBox(
+      color: Colors.black,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: buildMediaPlayer(carViewportConsumesBottomInset: true),
+      ),
+    );
+  }
+
+  Widget buildMediaPlayer({bool carViewportConsumesBottomInset = false}) {
     var boxFit = BoxFit.contain;
     double? aspectRatio;
     if (AppSettingsController.instance.scaleMode.value == 0) {
@@ -282,7 +310,11 @@ class LiveRoomPage extends GetView<LiveRoomController> {
           resumeUponEnteringForegroundMode:
               AppSettingsController.instance.playerAutoPause.value,
           controls: (state) {
-            return playerControls(state, controller);
+            return playerControls(
+              state,
+              controller,
+              carViewportConsumesBottomInset: carViewportConsumesBottomInset,
+            );
           },
           aspectRatio: aspectRatio,
           fit: boxFit,

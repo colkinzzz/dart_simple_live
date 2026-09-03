@@ -101,6 +101,10 @@ mixin PlayerStateMixin on PlayerMixin {
   /// 是否处于全屏状态
   RxBool fullScreenState = false.obs;
 
+  /// Window state granted by the vehicle launcher. Keep unknown conservative:
+  /// system bars stay visible and the player uses the visible pane bounds.
+  RxString carHostWindowState = 'unknown'.obs;
+
   /// 显示手势Tip
   RxBool showGestureTip = false.obs;
 
@@ -292,6 +296,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     // Do not let an older full-window response re-hide the bars after a newer
     // split-window response has already been requested.
     if (request != _carSystemUiRequest) return;
+    carHostWindowState.value = state.hostWindowState;
     final useImmersiveMode = fullScreenState.value &&
         state.supported &&
         state.hostWindowState == 'full';

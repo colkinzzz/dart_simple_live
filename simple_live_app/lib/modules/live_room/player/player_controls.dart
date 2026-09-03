@@ -23,13 +23,15 @@ import 'package:simple_live_core/simple_live_core.dart';
 
 Widget playerControls(
   VideoState videoState,
-  LiveRoomController controller,
-) {
+  LiveRoomController controller, {
+  bool carViewportConsumesBottomInset = false,
+}) {
   return Obx(() {
     if (controller.fullScreenState.value) {
       return buildFullControls(
         videoState,
         controller,
+        carViewportConsumesBottomInset: carViewportConsumesBottomInset,
       );
     }
     return buildControls(
@@ -42,11 +44,16 @@ Widget playerControls(
 
 Widget buildFullControls(
   VideoState videoState,
-  LiveRoomController controller,
-) {
+  LiveRoomController controller, {
+  bool carViewportConsumesBottomInset = false,
+}) {
   var padding = MediaQuery.paddingOf(videoState.context);
   final settings = AppSettingsController.instance;
-  if (Platform.isAndroid && settings.carMode.value) {
+  if (carViewportConsumesBottomInset) {
+    // The Video widget already ends above the OEM bottom/HVAC bar. Preserve
+    // the controls' original screen position by not consuming the inset twice.
+    padding = padding.copyWith(bottom: 0);
+  } else if (Platform.isAndroid && settings.carMode.value) {
     padding = padding.copyWith(
       bottom: math.max(
         padding.bottom,
