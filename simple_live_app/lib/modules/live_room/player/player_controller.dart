@@ -261,6 +261,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     //pip.dispose();
     if (Platform.isAndroid &&
         AppSettingsController.instance.carMode.value) {
+      _setCarSystemBarStyle(playerFullScreen: false);
       await SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.edgeToEdge,
         overlays: SystemUiOverlay.values,
@@ -297,6 +298,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     // split-window response has already been requested.
     if (request != _carSystemUiRequest) return;
     carHostWindowState.value = state.hostWindowState;
+    _setCarSystemBarStyle(playerFullScreen: fullScreenState.value);
     final useImmersiveMode = fullScreenState.value &&
         state.supported &&
         state.hostWindowState == 'full';
@@ -308,6 +310,21 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
         overlays: SystemUiOverlay.values,
       );
     }
+  }
+
+  void _setCarSystemBarStyle({required bool playerFullScreen}) {
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor:
+            playerFullScreen ? Colors.black : Colors.transparent,
+        statusBarIconBrightness:
+            playerFullScreen ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarDividerColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+    );
   }
 
   void enterFullScreen() {
