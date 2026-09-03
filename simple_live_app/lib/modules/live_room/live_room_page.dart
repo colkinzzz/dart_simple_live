@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:floating/floating.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,18 @@ import 'package:simple_live_app/widgets/settings/settings_number.dart';
 import 'package:simple_live_app/widgets/settings/settings_switch.dart';
 import 'package:simple_live_app/widgets/superchat_card.dart';
 import 'package:simple_live_core/simple_live_core.dart';
+
+double _bottomInteractiveInset(BuildContext context) {
+  final systemInset = MediaQuery.paddingOf(context).bottom;
+  final settings = AppSettingsController.instance;
+  if (!Platform.isAndroid || !settings.carMode.value) {
+    return systemInset;
+  }
+  return math.max(
+    systemInset,
+    settings.carBottomSafePadding.value.toDouble(),
+  );
+}
 
 class LiveRoomPage extends GetView<LiveRoomController> {
   const LiveRoomPage({Key? key}) : super(key: key);
@@ -179,7 +192,7 @@ class LiveRoomPage extends GetView<LiveRoomController> {
             ),
           ),
           padding: AppStyle.edgeInsetsV4.copyWith(
-            bottom: AppStyle.bottomBarHeight + 4,
+            bottom: _bottomInteractiveInset(context) + 4,
           ),
           child: Row(
             children: [
@@ -388,7 +401,7 @@ class LiveRoomPage extends GetView<LiveRoomController> {
           ),
         ),
       ),
-      padding: EdgeInsets.only(bottom: AppStyle.bottomBarHeight),
+      padding: EdgeInsets.only(bottom: _bottomInteractiveInset(context)),
       child: Row(
         children: [
           Expanded(
@@ -792,9 +805,9 @@ class LiveRoomPage extends GetView<LiveRoomController> {
         maxWidth: 600,
       ),
       isScrollControlled: true,
-      builder: (_) => Container(
+      builder: (sheetContext) => Container(
         padding: EdgeInsets.only(
-          bottom: AppStyle.bottomBarHeight,
+          bottom: _bottomInteractiveInset(sheetContext),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -51,11 +51,20 @@ void main() async {
   // Edge-to-edge lets the app background continue behind the transparent OEM
   // status bar. Interactive content is still protected by the car SafeArea.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  //设置状态栏为透明
-  SystemUiOverlayStyle systemUiOverlayStyle = const SystemUiOverlayStyle(
+  final isCarMode = Platform.isAndroid &&
+      AppSettingsController.instance.carMode.value;
+  // Keep the OEM climate/navigation area opaque in car mode. A transparent
+  // navigation bar otherwise exposes the page's (usually white) background
+  // and looks like an extra app-owned strip above the climate controls.
+  final systemUiOverlayStyle = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
-    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarColor: isCarMode ? Colors.black : Colors.transparent,
+    systemNavigationBarDividerColor:
+        isCarMode ? Colors.black : Colors.transparent,
+    systemNavigationBarIconBrightness:
+        isCarMode ? Brightness.light : null,
+    systemNavigationBarContrastEnforced: !isCarMode,
   );
   SystemChrome.setSystemUIOverlayStyle(systemUiOverlayStyle);
   runApp(const MyApp());
@@ -311,11 +320,14 @@ class MyApp extends StatelessWidget {
                 appContent = ColoredBox(
                   color: Theme.of(context).scaffoldBackgroundColor,
                   child: SafeArea(
+                    // Do not consume the bottom inset for the whole app. The
+                    // player and room action bars apply it once at the actual
+                    // interactive controls; consuming it here as well creates
+                    // an empty strip and offsets their hit targets.
+                    bottom: false,
                     child: Padding(
                       padding: EdgeInsets.only(
                         top: settings.carTopSafePadding.value.toDouble(),
-                        bottom:
-                            settings.carBottomSafePadding.value.toDouble(),
                       ),
                       child: appContent,
                     ),

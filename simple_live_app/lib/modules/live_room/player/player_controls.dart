@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -42,7 +44,16 @@ Widget buildFullControls(
   VideoState videoState,
   LiveRoomController controller,
 ) {
-  var padding = MediaQuery.of(videoState.context).padding;
+  var padding = MediaQuery.paddingOf(videoState.context);
+  final settings = AppSettingsController.instance;
+  if (Platform.isAndroid && settings.carMode.value) {
+    padding = padding.copyWith(
+      bottom: math.max(
+        padding.bottom,
+        settings.carBottomSafePadding.value.toDouble(),
+      ),
+    );
+  }
   GlobalKey volumeButtonkey = GlobalKey();
   return DragToMoveArea(
     child: Stack(
