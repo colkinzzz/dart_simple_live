@@ -1,8 +1,9 @@
 package com.xycz.simple_live
 
+import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.display.DisplayManager
 import android.os.Build
-import android.util.DisplayMetrics
 import android.view.Display
 import android.view.WindowInsets
 import io.flutter.embedding.android.FlutterActivity
@@ -25,9 +26,18 @@ class MainActivity : FlutterActivity() {
     }
 
     private data class PhysicalDisplay(
+        val displayId: Int,
         val width: Int,
         val height: Int,
-        val reliable: Boolean,
+    )
+
+    private data class DisplayCandidate(
+        val physical: PhysicalDisplay,
+        val width: Int,
+        val height: Int,
+        val areaGap: Long,
+        val dimensionGap: Int,
+        val aspectGap: Double,
     )
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -44,35 +54,121 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * Display.Mode is the only modern API here that describes the panel rather
-     * than the current task. getRealMetrics is retained only as an
-     * informational/legacy fallback and is deliberately not trusted for the
-     * full-screen decision on Android M and newer.
+     * Only a built-in display mode is a trusted physical-panel reference.
+     * Android car launchers can wrap the right-hand pane in TYPE_VIRTUAL (or
+     * overlay/Wi-Fi displays), whose mode is merely the pane size. Those modes
+     * must never authorize immersive system UI.
      */
     @Suppress("DEPRECATION")
-    private fun readPhysicalDisplay(targetDisplay: Display?): PhysicalDisplay? {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val mode = targetDisplay?.mode
-            if (mode != null && mode.physicalWidth > 0 && mode.physicalHeight > 0) {
-                return PhysicalDisplay(
-                    width = mode.physicalWidth,
-                    height = mode.physicalHeight,
-                    reliable = true,
-                )
-            }
+    private fun physicalDisplay(display: Display): PhysicalDisplay? {
+        if (display.type != Display.TYPE_BUILT_IN ||
+            (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 &&
+                !display.isValid)
+        ) {
+            return null
         }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
+        val mode = runCatching { display.mode }.getOrNull() ?: return null
+        if (mode.physicalWidth <= 0 || mode.physicalHeight <= 0) return null
+        return PhysicalDisplay(
+            displayId = display.displayId,
+            width = mode.physicalWidth,
+            height = mode.physicalHeight,
+        )
+    }
 
-        val metrics = DisplayMetrics()
-        targetDisplay?.getRealMetrics(metrics)
-        return if (metrics.widthPixels > 0 && metrics.heightPixels > 0) {
-            PhysicalDisplay(
-                width = metrics.widthPixels,
-                height = metrics.heightPixels,
-                reliable = false,
+    private fun orientedCandidates(
+        physical: PhysicalDisplay,
+        currentWidth: Int,
+        currentHeight: Int,
+    ): List<DisplayCandidate> {
+        if (currentWidth <= 0 || currentHeight <= 0) return emptyList()
+        val edgeTolerance = max(12, max(physical.width, physical.height) / 100)
+        val currentArea = currentWidth.toLong() * currentHeight.toLong()
+        val orientations = if (physical.width != physical.height) {
+            listOf(
+                physical.width to physical.height,
+                physical.height to physical.width,
             )
         } else {
-            null
+            listOf(physical.width to physical.height)
         }
+        return orientations.mapNotNull { (panelWidth, panelHeight) ->
+            val widthRatio = currentWidth.toDouble() / panelWidth
+            val heightRatio = currentHeight.toDouble() / panelHeight
+            if (currentWidth > panelWidth + edgeTolerance ||
+                currentHeight > panelHeight + edgeTolerance ||
+                widthRatio < 0.40 ||
+                heightRatio < 0.40
+            ) {
+                return@mapNotNull null
+            }
+            val panelArea = panelWidth.toLong() * panelHeight.toLong()
+            val areaGap = (panelArea - currentArea).coerceAtLeast(0)
+            val dimensionGap =
+                (panelWidth - currentWidth).coerceAtLeast(0) +
+                    (panelHeight - currentHeight).coerceAtLeast(0)
+            val currentAspect = currentWidth.toDouble() / currentHeight
+            val panelAspect = panelWidth.toDouble() / panelHeight
+            DisplayCandidate(
+                physical = physical,
+                width = panelWidth,
+                height = panelHeight,
+                areaGap = areaGap,
+                dimensionGap = dimensionGap,
+                aspectGap = abs(currentAspect - panelAspect),
+            )
+        }
+    }
+
+    /**
+     * Enumerate displays rather than trusting the Activity's current Display.
+     * If the Activity is virtual, choose a single smallest built-in panel that
+     * can contain the current window. Ties across physical displays are
+     * ambiguous and intentionally return null.
+     */
+    @Suppress("DEPRECATION")
+    private fun readPhysicalDisplay(
+        targetDisplay: Display?,
+        currentWidth: Int,
+        currentHeight: Int,
+    ): PhysicalDisplay? {
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE)
+            as? DisplayManager ?: return null
+        val visibleDisplays = try {
+            displayManager.getDisplays().toList()
+        } catch (_: RuntimeException) {
+            return null
+        }
+        val trustedDisplays = visibleDisplays.mapNotNull(::physicalDisplay)
+
+        // A built-in current display is already an unambiguous physical
+        // reference, but still prefer the enumerated instance when available.
+        val targetPhysical = targetDisplay?.let(::physicalDisplay)
+        if (targetPhysical != null) {
+            return trustedDisplays.firstOrNull {
+                it.displayId == targetPhysical.displayId
+            } ?: targetPhysical
+        }
+
+        if (trustedDisplays.isEmpty()) return null
+        val candidates = trustedDisplays.flatMap {
+            orientedCandidates(it, currentWidth, currentHeight)
+        }
+        val best = candidates.minWithOrNull(
+            compareBy<DisplayCandidate>(
+                { it.areaGap },
+                { it.dimensionGap },
+                { it.aspectGap },
+            ),
+        ) ?: return null
+        val tiedDisplayIds = candidates.filter {
+            it.areaGap == best.areaGap &&
+                it.dimensionGap == best.dimensionGap &&
+                abs(it.aspectGap - best.aspectGap) <= 0.01
+        }.map { it.physical.displayId }.toSet()
+        if (tiedDisplayIds.size > 1) return null
+        return best.physical.copy(width = best.width, height = best.height)
     }
 
     @Suppress("DEPRECATION")
@@ -83,9 +179,6 @@ class MainActivity : FlutterActivity() {
         } else {
             windowManager.defaultDisplay
         }
-        val physical = readPhysicalDisplay(targetDisplay)
-        val physicalWidth = physical?.width ?: 0
-        val physicalHeight = physical?.height ?: 0
         val isMultiWindow = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
             isInMultiWindowMode
         val isAutomotive = packageManager.hasSystemFeature(
@@ -129,11 +222,14 @@ class MainActivity : FlutterActivity() {
             currentBoundsRight = currentWidth
             currentBoundsBottom = currentHeight
         }
+        val physical = readPhysicalDisplay(targetDisplay, currentWidth, currentHeight)
+        val physicalWidth = physical?.width ?: 0
+        val physicalHeight = physical?.height ?: 0
 
         // A full host window must fill the reliable panel in both dimensions
         // and start at the display origin. The origin check matters on car
-        // launchers where a right-hand pane can look like a full-width virtual
-        // display to getRealMetrics().
+        // launchers where a right-hand pane is exposed through a virtual
+        // display; virtual display modes are never trusted as the panel.
         val directWidthRatio = if (physicalWidth > 0) {
             currentWidth.toDouble() / physicalWidth
         } else {
@@ -172,13 +268,13 @@ class MainActivity : FlutterActivity() {
         val startsAtDisplayOrigin =
             abs(currentBoundsLeft) <= edgeTolerance &&
                 abs(currentBoundsTop) <= edgeTolerance
-        val fillsReliablePanel = physical?.reliable == true &&
+        val fillsReliablePanel = physical != null &&
             widthRatio >= FULL_SIZE_THRESHOLD &&
             heightRatio >= FULL_SIZE_THRESHOLD &&
             widthRatio <= MAX_FULL_SIZE_RATIO &&
             heightRatio <= MAX_FULL_SIZE_RATIO &&
             startsAtDisplayOrigin
-        val hasReliableConstrainedBounds = physical?.reliable == true &&
+        val hasReliableConstrainedBounds = physical != null &&
             (widthRatio < SPLIT_SIZE_THRESHOLD ||
                 heightRatio < SPLIT_SIZE_THRESHOLD ||
                 !startsAtDisplayOrigin)
@@ -207,7 +303,7 @@ class MainActivity : FlutterActivity() {
             "currentBoundsBottomPx" to currentBoundsBottom,
             "physicalWidthPx" to physicalWidth,
             "physicalHeightPx" to physicalHeight,
-            "physicalDisplayReliable" to (physical?.reliable == true),
+            "physicalDisplayReliable" to (physical != null),
             "insetLeft" to insetLeft / density,
             "insetTop" to insetTop / density,
             "insetRight" to insetRight / density,

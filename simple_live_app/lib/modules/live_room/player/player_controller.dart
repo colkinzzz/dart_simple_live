@@ -229,6 +229,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
 
   final pip = Floating();
   StreamSubscription<PiPStatus>? _pipSubscription;
+  int _carSystemUiRequest = 0;
 
   //final VolumeController volumeController = VolumeController();
 
@@ -281,11 +282,16 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
 
   /// 进入全屏
   Future<void> syncCarSystemUi() async {
+    final request = ++_carSystemUiRequest;
     if (!Platform.isAndroid ||
         !AppSettingsController.instance.carMode.value) {
       return;
     }
     final state = await CarWindowService.getWindowState();
+    // A launcher window move can produce several metric callbacks in a row.
+    // Do not let an older full-window response re-hide the bars after a newer
+    // split-window response has already been requested.
+    if (request != _carSystemUiRequest) return;
     final useImmersiveMode = fullScreenState.value &&
         state.supported &&
         state.hostWindowState == 'full';

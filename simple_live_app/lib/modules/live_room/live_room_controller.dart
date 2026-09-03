@@ -1023,8 +1023,9 @@ ${error?.stackTrace}''');
 
   @override
   void didChangeMetrics() {
-    // Vehicle split/full transitions are delivered as window metric changes,
-    // even though this OEM does not set Android's standard multi-window flag.
+    // This observer is registered in onInit and removed in onClose. Vehicle
+    // split/full transitions are delivered as metric changes even though this
+    // OEM does not set Android's standard multi-window flag.
     syncCarSystemUi();
   }
 

@@ -388,8 +388,9 @@ class AppSettingsController extends GetxController {
     LocalStorageService.instance.setValue(LocalStorageService.kCarMode, e);
   }
 
-  // Kept for storage compatibility. System bars are never changed in car mode
-  // because OEM custom split-screen state cannot be detected reliably.
+  // Kept for storage compatibility. Car bar visibility is derived from the
+  // native host-window state; this legacy preference cannot override the
+  // conservative split/unknown behavior.
   var carHideSystemBars = false.obs;
   void setCarHideSystemBars(bool e) {
     carHideSystemBars.value = e;
