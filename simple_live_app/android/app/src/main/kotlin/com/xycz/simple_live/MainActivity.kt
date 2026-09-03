@@ -59,9 +59,27 @@ class MainActivity : FlutterActivity() {
      * overlay/Wi-Fi displays), whose mode is merely the pane size. Those modes
      * must never authorize immersive system UI.
      */
+    private fun isBuiltInDisplay(display: Display): Boolean {
+        // Some Android SDK stubs used by Flutter do not expose Display.type or
+        // TYPE_BUILT_IN even though the runtime API does. Resolve the public
+        // getter/constant without a compile-time dependency. If reflection is
+        // unavailable, only the platform default display is safe to accept.
+        val builtInType = runCatching {
+            Display::class.java.getField("TYPE_BUILT_IN").getInt(null)
+        }.getOrNull()
+        val displayType = runCatching {
+            Display::class.java.getMethod("getType").invoke(display) as? Int
+        }.getOrNull()
+        return if (builtInType != null && displayType != null) {
+            displayType == builtInType
+        } else {
+            display.displayId == Display.DEFAULT_DISPLAY
+        }
+    }
+
     @Suppress("DEPRECATION")
     private fun physicalDisplay(display: Display): PhysicalDisplay? {
-        if (display.type != Display.TYPE_BUILT_IN ||
+        if (!isBuiltInDisplay(display) ||
             (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 &&
                 !display.isValid)
         ) {
