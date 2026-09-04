@@ -18,9 +18,13 @@ class MinePage extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: Get.isDarkMode
           ? SystemUiOverlayStyle.light.copyWith(
+              statusBarColor: Theme.of(context).scaffoldBackgroundColor,
+              systemStatusBarContrastEnforced: false,
               systemNavigationBarColor: Colors.transparent,
             )
           : SystemUiOverlayStyle.dark.copyWith(
+              statusBarColor: Theme.of(context).scaffoldBackgroundColor,
+              systemStatusBarContrastEnforced: false,
               systemNavigationBarColor: Colors.transparent,
             ),
       child: SafeArea(

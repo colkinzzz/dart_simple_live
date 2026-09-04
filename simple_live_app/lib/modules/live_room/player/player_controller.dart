@@ -313,12 +313,20 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
   }
 
   void _setCarSystemBarStyle({required bool playerFullScreen}) {
+    final context = Get.context;
+    final theme = context == null ? null : Theme.of(context);
+    final windowedBackground =
+        theme?.scaffoldBackgroundColor ??
+            (Get.isDarkMode ? Colors.black : Colors.white);
+    final windowedIconBrightness = theme?.brightness == Brightness.dark
+        ? Brightness.light
+        : Brightness.dark;
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
-        statusBarColor:
-            playerFullScreen ? Colors.black : Colors.transparent,
+        statusBarColor: playerFullScreen ? Colors.black : windowedBackground,
         statusBarIconBrightness:
-            playerFullScreen ? Brightness.light : Brightness.dark,
+            playerFullScreen ? Brightness.light : windowedIconBrightness,
+        systemStatusBarContrastEnforced: false,
         systemNavigationBarColor: Colors.black,
         systemNavigationBarDividerColor: Colors.black,
         systemNavigationBarIconBrightness: Brightness.light,

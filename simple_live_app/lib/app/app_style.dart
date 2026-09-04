@@ -33,6 +33,8 @@ class AppStyle {
       ),
       foregroundColor: AppColors.black333,
       systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: AppColors.lightColorScheme.surface,
+        systemStatusBarContrastEnforced: false,
         systemNavigationBarColor: Colors.transparent,
       ),
     ),
@@ -78,6 +80,8 @@ class AppStyle {
       ),
       foregroundColor: Colors.white,
       systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: AppColors.darkColorScheme.surface,
+        systemStatusBarContrastEnforced: false,
         systemNavigationBarColor: Colors.transparent,
       ),
     ),

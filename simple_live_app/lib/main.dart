@@ -53,12 +53,24 @@ void main() async {
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   final isCarMode = Platform.isAndroid &&
       AppSettingsController.instance.carMode.value;
+  final selectedThemeMode = ThemeMode
+      .values[AppSettingsController.instance.themeMode.value];
+  final platformIsDark =
+      WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+          Brightness.dark;
+  final useDarkTheme = selectedThemeMode == ThemeMode.dark ||
+      (selectedThemeMode == ThemeMode.system && platformIsDark);
+  final statusBarBackground = useDarkTheme
+      ? AppStyle.darkTheme.scaffoldBackgroundColor
+      : AppStyle.lightTheme.scaffoldBackgroundColor;
   // Keep the OEM climate/navigation area opaque in car mode. A transparent
   // navigation bar otherwise exposes the page's (usually white) background
   // and looks like an extra app-owned strip above the climate controls.
   final systemUiOverlayStyle = SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
+    statusBarColor: isCarMode ? statusBarBackground : Colors.transparent,
+    statusBarIconBrightness:
+        useDarkTheme ? Brightness.light : Brightness.dark,
+    systemStatusBarContrastEnforced: false,
     systemNavigationBarColor: isCarMode ? Colors.black : Colors.transparent,
     systemNavigationBarDividerColor:
         isCarMode ? Colors.black : Colors.transparent,
